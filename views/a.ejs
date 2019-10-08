@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.15/lodash.js"></script>
+    <title>Document</title>
+    <style>
+        .entrou {
+            padding: 10px;
+            color: white;
+            background-color: steelblue;
+        }
+
+        .pessoa-digitando {
+            color: red;
+            padding: 10px;
+        }
+
+        #messages {
+            height: 300px;
+            overflow: auto;
+            border: 1px solid blue;
+        }
+
+        .message-voce {
+            color: blue;
+            text-align: right;
+        }
+
+        .message {
+            margin: 10px;
+        }
+
+        .message-outro {
+            color: orange;
+            text-align: left;
+        }
+
+        .input-message {
+            padding: 10px;
+            font-size: 12pt;
+        }
+    </style>
+
+</head>
+
+
+<body>
+
+    <div id="app">
+
+
+        <div v-if="!entrou">
+            <input type="text" v-model="nomeUsuario" placeholder="Usuário" />
+            <button v-on:click="entrar">Entrar</button>
+        </div>
+
+
+        <div v-if="entrou">
+            <h1>{{nomeUsuario}}</h1>
+            <input type="text" @keyup="keyup" class="input-message" v-model="message" placeholder="Mensagem" />
+            <button v-on:click="enviar">Enviar</button>
+
+
+            <div class="entrou" v-for="usuario in usuarios">
+                <h1>{{usuario}} entrou no chat</h1>
+            </div>
+
+
+            <div id="messages">
+                <div v-for="message in messages" class="message">
+                    <div :class="`message-${message.usuario === nomeUsuario? 'voce': 'outro'}`">
+                        <b>{{message.usuario === nomeUsuario? 'Você': message.usuario}} enviou: </b> {{message.body}}
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="pessoaDigitando" class="pessoa-digitando">
+                {{pessoaDigitando}} está digitando...
+            </div>
+
+        </div>
+
+    </div>
+</body>
+
+
+<script>
+    const socket = io("192.168.137.152:3000", {
+        query: {
+            nome: "Misael"
+        }
+    });
+
+    const app = new Vue({
+        el: '#app',
+        data: {
+            entrou: false,
+            messages: [],
+            usuarios: [],
+            message: '',
+            nomeUsuario: '',
+            pessoaDigitando: ''
+        },
+        watch: {
+            message() {
+                socket.emit("digitando")
+            },
+            messages() {
+                setTimeout(() => {
+                    this.scrollToEnd()
+                }, 500)
+            }
+        },
+        methods: {
+            keyup(event) {
+                if (event.keyCode == 13) {
+                    this.enviar()
+                }
+            },
+            scrollToEnd() {
+                var container = this.$el.querySelector("#messages");
+                container.scrollTop = container.scrollHeight + 100;
+            },
+            enviar() {
+                socket.emit("new_message", this.message)
+                this.message = ""
+            },
+            entrar() {
+                this.nomeUsuario = _.startCase(this.nomeUsuario.toLowerCase());
+                socket.emit("entrar", _.startCase(this.nomeUsuario))
+                this.entrou = true;
+            }
+        }
+
+    })
+
+    socket.on("new_message", (message) => {
+        app.messages.push(message)
+    })
+
+    socket.on("init_load", messages => {
+        app.messages.push(...messages)
+    })
+
+    socket.on("digitando", pessoa => {
+        app.pessoaDigitando = pessoa
+        setTimeout(() => {
+            app.pessoaDigitando = null
+        }, 500)
+    })
+    
+    socket.on("new_user", usuario => {
+        app.usuarios.push(usuario);
+        setTimeout(() => {
+            app.usuarios.pop();
+        }, 1000)
+    })
+
+</script>
+
+</html>
